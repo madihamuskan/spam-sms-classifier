@@ -17,7 +17,24 @@ ps = PorterStemmer()
 # Make sure required NLTK data is available
 # nltk.download('punkt')
 # nltk.download('stopwords')
+import nltk
+import os
 
+nltk_data_path = os.path.join(os.getcwd(), "nltk_data")
+if not os.path.exists(nltk_data_path):
+    os.makedirs(nltk_data_path)
+
+nltk.data.path.append(nltk_data_path)
+
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', download_dir=nltk_data_path)
+
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', download_dir=nltk_data_path)
 
 def transform_text(text):
     text = text.lower()
@@ -69,4 +86,5 @@ def home():
     return render_template('index.html', prediction=prediction, message=input_sms)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
