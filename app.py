@@ -2,43 +2,41 @@ from flask import Flask, render_template, request
 import pickle
 import string
 import nltk
-from nltk.corpus import stopwords
+import os
 from nltk.stem.porter import PorterStemmer
-from nltk.corpus import stopwords
 
-STOPWORDS = set(stopwords.words('english'))
-# Initialize app
+# ---------- APP INIT ----------
 app = Flask(__name__)
 
-# Load model and vectorizer
-tfidf = pickle.load(open('vectorizer.pkl', 'rb'))
-model = pickle.load(open('model.pkl', 'rb'))
-
-ps = PorterStemmer()
-
-# Make sure required NLTK data is available
-# nltk.download('punkt')
-# nltk.download('stopwords')
-import nltk
-import os
-
+# ---------- NLTK SETUP ----------
 nltk_data_path = os.path.join(os.getcwd(), "nltk_data")
-if not os.path.exists(nltk_data_path):
-    os.makedirs(nltk_data_path)
-
+os.makedirs(nltk_data_path, exist_ok=True)
 nltk.data.path.append(nltk_data_path)
 
+# Download required data safely
 try:
     nltk.data.find('tokenizers/punkt')
-except LookupError:
+except:
     nltk.download('punkt', download_dir=nltk_data_path)
 
 try:
     nltk.data.find('corpora/stopwords')
-except LookupError:
+except:
     nltk.download('stopwords', download_dir=nltk_data_path)
 
+from nltk.corpus import stopwords
+STOPWORDS = set(stopwords.words('english'))
 
+# ---------- MODEL LOAD ----------
+try:
+    tfidf = pickle.load(open('vectorizer.pkl', 'rb'))
+    model = pickle.load(open('model.pkl', 'rb'))
+except Exception as e:
+    print("MODEL LOAD ERROR:", e)
+
+ps = PorterStemmer()
+
+# ---------- TEXT PREPROCESS ----------
 def transform_text(text):
     if not text:
         return ""
@@ -50,14 +48,18 @@ def transform_text(text):
     except:
         words = text.split()  # fallback if tokenizer fails
 
+    # remove non-alphanumeric
     words = [w for w in words if w.isalnum()]
+
+    # remove stopwords
     words = [w for w in words if w not in STOPWORDS]
+
+    # stemming
     words = [ps.stem(w) for w in words]
 
     return " ".join(words)
 
-
-
+# ---------- ROUTE ----------
 @app.route('/', methods=['GET', 'POST'])
 def home():
     prediction = None
@@ -75,11 +77,12 @@ def home():
                 prediction = "Spam" if result == 1 else "Not Spam"
 
         except Exception as e:
-            print("ERROR:", e)  # shows in Render logs
-            prediction = str(e)  # show error on UI for debugging
+            print("ERROR:", e)
+            prediction = "Something went wrong"
 
     return render_template('index.html', prediction=prediction, message=input_sms)
 
+# ---------- RUN ----------
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
