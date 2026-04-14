@@ -4,7 +4,9 @@ import string
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
+from nltk.corpus import stopwords
 
+STOPWORDS = set(stopwords.words('english'))
 # Initialize app
 app = Flask(__name__)
 
@@ -36,29 +38,24 @@ try:
 except LookupError:
     nltk.download('stopwords', download_dir=nltk_data_path)
 
+
 def transform_text(text):
+    if not text:
+        return ""
+
     text = text.lower()
-    text = nltk.word_tokenize(text)
 
-    y = []
-    for i in text:
-        if i.isalnum():
-            y.append(i)
+    try:
+        words = nltk.word_tokenize(text)
+    except:
+        words = text.split()  # fallback if tokenizer fails
 
-    text = y[:]
-    y.clear()
+    words = [w for w in words if w.isalnum()]
+    words = [w for w in words if w not in STOPWORDS]
+    words = [ps.stem(w) for w in words]
 
-    for i in text:
-        if i not in stopwords.words('english') and i not in string.punctuation:
-            y.append(i)
+    return " ".join(words)
 
-    text = y[:]
-    y.clear()
-
-    for i in text:
-        y.append(ps.stem(i))
-
-    return " ".join(y)
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -67,21 +64,19 @@ def home():
     input_sms = ""
 
     if request.method == 'POST':
-        input_sms = request.form.get('message')
+        input_sms = request.form.get('message', '')
 
-        # preprocess
-        transformed_sms = transform_text(input_sms)
+        try:
+            if input_sms.strip():
+                transformed_sms = transform_text(input_sms)
+                vector_input = tfidf.transform([transformed_sms])
+                result = model.predict(vector_input)[0]
 
-        # vectorize
-        vector_input = tfidf.transform([transformed_sms])
+                prediction = "Spam" if result == 1 else "Not Spam"
 
-        # predict
-        result = model.predict(vector_input)[0]
-
-        if result == 1:
-            prediction = "Spam"
-        else:
-            prediction = "Not Spam"
+        except Exception as e:
+            print("ERROR:", e)  # shows in Render logs
+            prediction = str(e)  # show error on UI for debugging
 
     return render_template('index.html', prediction=prediction, message=input_sms)
 
